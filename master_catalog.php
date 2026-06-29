@@ -96,7 +96,7 @@ include_once 'includes/header.php';
                             <thead>
                                 <tr>
                                     <th class="ps-4" style="width: 25%;">Name</th>
-                                    <th style="width: 45%;">Description</th>
+                                    <th style="width: 45%;">Specifications</th>
                                     <th style="width: 15%;">Unit <span class="text-muted font-normal text-xs">(click to edit)</span></th>
                                     <th class="pe-4" style="width: 15%;">Min. Stock <span class="text-muted font-normal text-xs">(click to edit)</span></th>
                                 </tr>
@@ -143,7 +143,7 @@ include_once 'includes/header.php';
                 <input type="text" name="item_name" class="form-control" required placeholder="e.g. Circular Saw">
             </div>
             <div class="mb-3">
-                <label class="form-label small">Operational Description</label>
+                <label class="form-label small">Specifications</label>
                 <input type="text" name="description" class="form-control" required placeholder="Electric circular saw for cutting wood...">
             </div>
             
