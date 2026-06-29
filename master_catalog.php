@@ -34,7 +34,7 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_catalog_type'])) {
     exit;
 }
 
-// --- BAGO: 2. HANDLE EDIT/UPDATE LOGIC ---
+// --- 2. HANDLE EDIT/UPDATE LOGIC ---
 if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_catalog_type'])) {
     $catalog_id = (int)$_POST['catalog_id'];
     $name = $_POST['item_name'];
@@ -45,9 +45,8 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_catalog_type']))
     $min  = (int)$_POST['minimum_stock'];
     $existing_image = $_POST['existing_image'];
 
-    $image_name = $existing_image; // Default ay yung dating larawan
+    $image_name = $existing_image;
 
-    // Kung nag-upload ng bagong larawan
     if(isset($_FILES['item_image']) && $_FILES['item_image']['error'] == 0) {
         $target_dir = __DIR__ . "/uploads/";
         $file_extension = strtolower(pathinfo($_FILES["item_image"]["name"], PATHINFO_EXTENSION));
@@ -58,7 +57,6 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_catalog_type']))
             if(move_uploaded_file($_FILES["item_image"]["tmp_name"], $target_dir . $new_image)) {
                 $image_name = $new_image;
                 
-                // OPTIONAL: Burahin ang lumang file sa folder para hindi mapuno ang disk space
                 if(!empty($existing_image) && file_exists($target_dir . $existing_image)) {
                     unlink($target_dir . $existing_image);
                 }
@@ -66,13 +64,44 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_catalog_type']))
         }
     }
 
-    // I-execute ang SQL UPDATE
     $stmt = $conn->prepare("UPDATE master_catalog SET item_name = ?, description = ?, category = ?, qualification = ?, unit_type = ?, minimum_stock = ?, item_image = ? WHERE catalog_id = ?");
     $stmt->bind_param("sssssisi", $name, $desc, $cat, $qual, $unit, $min, $image_name, $catalog_id);
     $stmt->execute();
     $stmt->close();
     header("Location: master_catalog.php");
     exit;
+}
+
+// --- 3. HANDLE DELETE LOGIC ---
+if(isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
+    $catalog_id = (int)$_GET['id'];
+    
+    $stmt = $conn->prepare("SELECT item_image FROM master_catalog WHERE catalog_id = ?");
+    $stmt->bind_param("i", $catalog_id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    
+    if($res && !empty($res['item_image'])) {
+        $file_path = __DIR__ . "/uploads/" . $res['item_image'];
+        if(file_exists($file_path)) {
+            unlink($file_path);
+        }
+    }
+    
+    $stmt = $conn->prepare("DELETE FROM master_catalog WHERE catalog_id = ?");
+    $stmt->bind_param("i", $catalog_id);
+    $stmt->execute();
+    $stmt->close();
+    
+    header("Location: master_catalog.php");
+    exit;
+}
+
+// 4. HANDLE SEARCH KEYWORD EXTRACTION
+$search_keyword = "";
+if(isset($_GET['search'])) {
+    $search_keyword = trim($_GET['search']);
 }
 
 // Listahan ng mga Qualifications
@@ -83,6 +112,25 @@ $qualifications = [
     'CONSP' => 'Construction Painting (CONSP)',
     'Carpentry' => 'Carpentry'
 ];
+
+// BAGO: SMART AUTO-TAB FOCUS DETECTION
+// Kung may search keyword, hahanapin natin kung saang qualification unang may match para i-force open ang tab na 'yon
+$active_tab_key = 'SMAW'; // Default fallback tab
+if(!empty($search_keyword)) {
+    foreach($qualifications as $key => $display_name) {
+        $like_parameter = "%" . $search_keyword . "%";
+        $check_stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM master_catalog WHERE qualification = ? AND (item_name LIKE ? OR description LIKE ?)");
+        $check_stmt->bind_param("sss", $display_name, $like_parameter, $like_parameter);
+        $check_stmt->execute();
+        $check_res = $check_stmt->get_result()->fetch_assoc();
+        $check_stmt->close();
+        
+        if($check_res && $check_res['cnt'] > 0) {
+            $active_tab_key = $key; // Nahanap ang qualification kung saan may tumatama na tool record!
+            break; // Stop loop kapag nahanap na ang unang match
+        }
+    }
+}
 
 // Original na mga Categories
 $categories = ['Power Tools', 'Hand Tools', 'PPE / Safety', 'Chemicals & Solvents'];
@@ -116,39 +164,55 @@ include_once 'includes/header.php';
     </button>
 </div>
 
-<div class="mb-4">
+<form action="master_catalog.php" method="GET" class="mb-4">
     <div class="input-group bg-white border rounded shadow-sm">
         <span class="input-group-text bg-white border-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
-        <input type="text" class="form-control border-0 py-2" placeholder="Search operational catalog inventory...">
+        <input type="text" name="search" class="form-control border-0 py-2" placeholder="Type tool name or specifications and press Enter..." value="<?php echo htmlspecialchars($search_keyword); ?>">
+        <?php if(!empty($search_keyword)): ?>
+            <a href="master_catalog.php" class="btn btn-light bg-white border-0 text-muted d-flex align-items-center justify-content-center pe-3"><i class="fa-solid fa-xmark"></i></a>
+        <?php endif; ?>
     </div>
-</div>
+    <?php if(!empty($search_keyword)): ?>
+        <div class="form-text text-secondary mt-1 ms-1" style="font-size: 0.8rem;">
+            Active Search Filter: <span class="badge bg-secondary text-white rounded-pill px-2 py-1">"<?php echo htmlspecialchars($search_keyword); ?>"</span>
+        </div>
+    <?php endif; ?>
+</form>
 
+<!-- MODIFIED: GUMAGAMIT NA NG SMART ACTIVE TAB KEY -->
 <ul class="nav nav-pills gap-2 mb-4 flex-nowrap overflow-auto pb-2" id="qualificationTabs" role="tablist">
     <?php 
-    $isFirst = true;
     foreach($qualifications as $key => $display_name): 
+        $isActive = ($key === $active_tab_key); // Tinitingnan kung ito ba ang dapat naka-focus na tab
     ?>
         <li class="nav-item" role="presentation">
-            <button class="nav-link <?php echo $isFirst ? 'active' : ''; ?>" id="tab-<?php echo $key; ?>" data-bs-toggle="tab" data-bs-target="#content-<?php echo $key; ?>" type="button" role="tab">
+            <button class="nav-link <?php echo $isActive ? 'active' : ''; ?>" id="tab-<?php echo $key; ?>" data-bs-toggle="tab" data-bs-target="#content-<?php echo $key; ?>" type="button" role="tab">
                 <?php echo $display_name; ?>
             </button>
         </li>
     <?php 
-        $isFirst = false;
     endforeach; 
     ?>
 </ul>
 
+<!-- MODIFIED: GUMAGAMIT NA RIN NG SMART ACTIVE TAB KEY PARA SA CONTENT -->
 <div class="tab-content" id="qualificationTabsContent">
     <?php 
-    $isFirst = true;
     foreach($qualifications as $key => $display_name): 
+        $isActive = ($key === $active_tab_key);
     ?>
-        <div class="tab-pane fade <?php echo $isFirst ? 'show active' : ''; ?>" id="content-<?php echo $key; ?>" role="tabpanel">
+        <div class="tab-pane fade <?php echo $isActive ? 'show active' : ''; ?>" id="content-<?php echo $key; ?>" role="tabpanel">
             
             <?php foreach($categories as $cat_name): 
-                $stmt = $conn->prepare("SELECT * FROM master_catalog WHERE qualification = ? AND category = ? ORDER BY item_name ASC");
-                $stmt->bind_param("ss", $display_name, $cat_name);
+                if(!empty($search_keyword)) {
+                    $stmt = $conn->prepare("SELECT * FROM master_catalog WHERE qualification = ? AND category = ? AND (item_name LIKE ? OR description LIKE ?) ORDER BY item_name ASC");
+                    $like_parameter = "%" . $search_keyword . "%";
+                    $stmt->bind_param("ssss", $display_name, $cat_name, $like_parameter, $like_parameter);
+                } else {
+                    $stmt = $conn->prepare("SELECT * FROM master_catalog WHERE qualification = ? AND category = ? ORDER BY item_name ASC");
+                    $stmt->bind_param("ss", $display_name, $cat_name);
+                }
+                
                 $stmt->execute();
                 $items = $stmt->get_result();
             ?>
@@ -172,7 +236,7 @@ include_once 'includes/header.php';
                                     <th style="width: 33%;">Specifications</th>
                                     <th style="width: 10%;">Unit</th>
                                     <th style="width: 10%;">Min. Stock</th>
-                                    <th class="pe-4 text-center" style="width: 15%;">Action</th> </tr>
+                                    <th class="pe-4 text-center" style="width: 15%;">Actions</th> </tr>
                             </thead>
                             <tbody>
                                 <?php if($items->num_rows > 0): ?>
@@ -191,24 +255,32 @@ include_once 'includes/header.php';
                                             <td class="font-monospace fw-semibold text-dark" style="font-size: 0.85rem;"><?php echo $row['minimum_stock']; ?></td>
                                             
                                             <td class="pe-4 text-center">
-                                                <button class="btn btn-sm btn-outline-secondary px-3 rounded-pill edit-btn"
-                                                        data-bs-toggle="modal" 
-                                                        data-bs-target="#editTypeModal"
-                                                        data-id="<?php echo $row['catalog_id']; ?>"
-                                                        data-name="<?php echo htmlspecialchars($row['item_name']); ?>"
-                                                        data-desc="<?php echo htmlspecialchars($row['description']); ?>"
-                                                        data-qual="<?php echo htmlspecialchars($row['qualification']); ?>"
-                                                        data-cat="<?php echo htmlspecialchars($row['category']); ?>"
-                                                        data-unit="<?php echo htmlspecialchars($row['unit_type']); ?>"
-                                                        data-min="<?php echo $row['minimum_stock']; ?>"
-                                                        data-img="<?php echo htmlspecialchars($row['item_image']); ?>">
-                                                    <i class="fa-solid fa-pen-to-square me-1"></i>Edit
-                                                </button>
+                                                <div class="d-inline-flex gap-1">
+                                                    <button class="btn btn-sm btn-outline-secondary px-2 rounded-pill edit-btn"
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#editTypeModal"
+                                                            data-id="<?php echo $row['catalog_id']; ?>"
+                                                            data-name="<?php echo htmlspecialchars($row['item_name']); ?>"
+                                                            data-desc="<?php echo htmlspecialchars($row['description']); ?>"
+                                                            data-qual="<?php echo htmlspecialchars($row['qualification']); ?>"
+                                                            data-cat="<?php echo htmlspecialchars($row['category']); ?>"
+                                                            data-unit="<?php echo htmlspecialchars($row['unit_type']); ?>"
+                                                            data-min="<?php echo $row['minimum_stock']; ?>"
+                                                            data-img="<?php echo htmlspecialchars($row['item_image']); ?>">
+                                                        <i class="fa-solid fa-pen-to-square"></i>
+                                                    </button>
+                                                    
+                                                    <a href="master_catalog.php?action=delete&id=<?php echo $row['catalog_id']; ?>" 
+                                                       class="btn btn-sm btn-outline-danger px-2 rounded-pill delete-btn"
+                                                       onclick="return confirm('Are you sure that you want to permanently delete \'<?php echo addslashes(htmlspecialchars($row['item_name'])); ?>\' from the Master Catalog?');">
+                                                        <i class="fa-solid fa-trash-can"></i>
+                                                    </a>
+                                                </div>
                                             </td>
                                         </tr>
                                     <?php endwhile; ?>
                                 <?php else: ?>
-                                    <tr><td colspan="6" class="text-center text-muted py-4 small"><i class="fa-solid fa-inbox me-2 opacity-50"></i>No definitions added under this classification cluster yet.</td></tr>
+                                    <tr><td colspan="6" class="text-center text-muted py-4 small"><i class="fa-solid fa-circle-info me-2 opacity-50"></i>No matching inventory definitions found in this section.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
@@ -221,11 +293,11 @@ include_once 'includes/header.php';
 
         </div>
     <?php 
-        $isFirst = false;
     endforeach; 
     ?>
 </div>
 
+<!-- --- MODAL 1: ADD ITEM TYPE --- -->
 <div class="modal fade" id="addTypeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form action="master_catalog.php" method="POST" enctype="multipart/form-data" class="modal-content border-0 shadow">
@@ -280,6 +352,7 @@ include_once 'includes/header.php';
   </div>
 </div>
 
+<!-- --- MODAL 2: EDIT/UPDATE DATA POPUP --- -->
 <div class="modal fade" id="editTypeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form action="master_catalog.php" method="POST" enctype="multipart/form-data" class="modal-content border-0 shadow">
@@ -338,6 +411,7 @@ include_once 'includes/header.php';
   </div>
 </div>
 
+<!-- --- MODAL 3: BIG PREVIEW --- -->
 <div class="modal fade" id="viewImageModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -352,9 +426,9 @@ include_once 'includes/header.php';
   </div>
 </div>
 
+<!-- --- JAVASCRIPT LAYER INTERACTION INTERFACE --- -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // 1. Logic para sa Big Image Preview Popup Trigger
     var viewImageModal = document.getElementById('viewImageModal');
     if (viewImageModal) {
         viewImageModal.addEventListener('show.bs.modal', function (event) {
@@ -367,11 +441,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // BAGO: 2. Logic para sa Edit Button Auto-Data Field Injection
     var editButtons = document.querySelectorAll('.edit-btn');
     editButtons.forEach(function(button) {
         button.addEventListener('click', function() {
-            // Isaksak ang data values mula sa button patungo sa form input fields inside Edit Modal
             document.getElementById('edit_catalog_id').value = this.getAttribute('data-id');
             document.getElementById('edit_item_name').value = this.getAttribute('data-name');
             document.getElementById('edit_description').value = this.getAttribute('data-desc');
@@ -381,7 +453,6 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById('edit_minimum_stock').value = this.getAttribute('data-min');
             document.getElementById('edit_existing_image').value = this.getAttribute('data-img');
 
-            // Mag-display ng maikling paalala kung may dating image file
             var imgFile = this.getAttribute('data-img');
             var statusDiv = document.getElementById('edit_img_status');
             if(imgFile) {
