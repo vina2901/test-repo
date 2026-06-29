@@ -113,9 +113,8 @@ $qualifications = [
     'Carpentry' => 'Carpentry'
 ];
 
-// BAGO: SMART AUTO-TAB FOCUS DETECTION
-// Kung may search keyword, hahanapin natin kung saang qualification unang may match para i-force open ang tab na 'yon
-$active_tab_key = 'SMAW'; // Default fallback tab
+// SMART AUTO-TAB FOCUS DETECTION
+$active_tab_key = 'SMAW';
 if(!empty($search_keyword)) {
     foreach($qualifications as $key => $display_name) {
         $like_parameter = "%" . $search_keyword . "%";
@@ -126,8 +125,8 @@ if(!empty($search_keyword)) {
         $check_stmt->close();
         
         if($check_res && $check_res['cnt'] > 0) {
-            $active_tab_key = $key; // Nahanap ang qualification kung saan may tumatama na tool record!
-            break; // Stop loop kapag nahanap na ang unang match
+            $active_tab_key = $key;
+            break;
         }
     }
 }
@@ -148,10 +147,15 @@ include_once 'includes/header.php';
         background-color: #00b4d8 !important; color: #fff !important;
         box-shadow: 0 4px 12px rgba(0, 180, 216, 0.25); border-color: #00b4d8 !important;
     }
-    .category-badge-header { background-color: #f8fafc; border-bottom: 1px solid #f1f5f9; }
     .tool-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; background-color: #f8fafc; display: block; cursor: pointer; transition: transform 0.2s ease; }
     .tool-thumb:hover { transform: scale(1.08); border-color: #00b4d8; }
     .tool-thumb-placeholder { width: 50px; height: 50px; border-radius: 6px; background-color: #f1f5f9; display: inline-flex; align-items: center; justify-content: center; color: #94a3b8; border: 1px dotted #cbd5e1; font-size: 1.2rem; }
+    
+    /* BAGO: Dynamic Custom Card Headers Base Styles */
+    .header-power-tools { background-color: #0b2545 !important; color: #ffffff !important; }
+    .header-hand-tools { background-color: #00b4d8 !important; color: #ffffff !important; }
+    .header-ppe-safety { background-color: #fccb05 !important; color: #1e293b !important; } /* Dark text para mabasa sa yellow */
+    .header-chemicals-solvents { background-color: #64748b !important; color: #ffffff !important; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -179,11 +183,10 @@ include_once 'includes/header.php';
     <?php endif; ?>
 </form>
 
-<!-- MODIFIED: GUMAGAMIT NA NG SMART ACTIVE TAB KEY -->
 <ul class="nav nav-pills gap-2 mb-4 flex-nowrap overflow-auto pb-2" id="qualificationTabs" role="tablist">
     <?php 
     foreach($qualifications as $key => $display_name): 
-        $isActive = ($key === $active_tab_key); // Tinitingnan kung ito ba ang dapat naka-focus na tab
+        $isActive = ($key === $active_tab_key);
     ?>
         <li class="nav-item" role="presentation">
             <button class="nav-link <?php echo $isActive ? 'active' : ''; ?>" id="tab-<?php echo $key; ?>" data-bs-toggle="tab" data-bs-target="#content-<?php echo $key; ?>" type="button" role="tab">
@@ -195,7 +198,6 @@ include_once 'includes/header.php';
     ?>
 </ul>
 
-<!-- MODIFIED: GUMAGAMIT NA RIN NG SMART ACTIVE TAB KEY PARA SA CONTENT -->
 <div class="tab-content" id="qualificationTabsContent">
     <?php 
     foreach($qualifications as $key => $display_name): 
@@ -215,14 +217,32 @@ include_once 'includes/header.php';
                 
                 $stmt->execute();
                 $items = $stmt->get_result();
+
+                // BAGO: PHP Logic Mapping para tukuyin ang tamang CSS style variant base sa Category name
+                $header_css_class = "";
+                $category_icon = "fa-layer-group";
+                
+                if ($cat_name === 'Power Tools') {
+                    $header_css_class = "header-power-tools";
+                    $category_icon = "fa-plug-circle-bolt";
+                } elseif ($cat_name === 'Hand Tools') {
+                    $header_css_class = "header-hand-tools";
+                    $category_icon = "fa-screwdriver-wrench";
+                } elseif ($cat_name === 'PPE / Safety') {
+                    $header_css_class = "header-ppe-safety";
+                    $category_icon = "fa-helmet-safety";
+                } elseif ($cat_name === 'Chemicals & Solvents') {
+                    $header_css_class = "header-chemicals-solvents";
+                    $category_icon = "fa-flask-vial";
+                }
             ?>
                 <div class="card bg-white border-0 shadow-sm mb-4" style="border-radius: 8px; overflow: hidden;">
-                    <div class="card-header category-badge-header py-3">
+                    <div class="card-header py-3 <?php echo $header_css_class; ?>">
                         <div class="d-flex align-items-center">
-                            <span class="p-2 rounded me-2 d-inline-flex justify-content-center align-items-center" style="width: 28px; height: 28px; background-color: #e0f2fe !important; color: #0369a1 !important;">
-                                <i class="fa-solid fa-layer-group" style="font-size: 0.85rem;"></i>
+                            <span class="me-2 d-inline-flex justify-content-center align-items-center opacity-90" style="font-size: 1.1rem;">
+                                <i class="fa-solid <?php echo $category_icon; ?>"></i>
                             </span>
-                            <h6 class="m-0 fw-bold text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                            <h6 class="m-0 fw-bold text-uppercase tracking-wider" style="font-size: 0.85rem; letter-spacing: 0.05em;">
                                 <?php echo $cat_name; ?>
                             </h6>
                         </div>
@@ -297,7 +317,6 @@ include_once 'includes/header.php';
     ?>
 </div>
 
-<!-- --- MODAL 1: ADD ITEM TYPE --- -->
 <div class="modal fade" id="addTypeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form action="master_catalog.php" method="POST" enctype="multipart/form-data" class="modal-content border-0 shadow">
@@ -352,7 +371,6 @@ include_once 'includes/header.php';
   </div>
 </div>
 
-<!-- --- MODAL 2: EDIT/UPDATE DATA POPUP --- -->
 <div class="modal fade" id="editTypeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form action="master_catalog.php" method="POST" enctype="multipart/form-data" class="modal-content border-0 shadow">
@@ -411,7 +429,6 @@ include_once 'includes/header.php';
   </div>
 </div>
 
-<!-- --- MODAL 3: BIG PREVIEW --- -->
 <div class="modal fade" id="viewImageModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow">
@@ -426,7 +443,6 @@ include_once 'includes/header.php';
   </div>
 </div>
 
-<!-- --- JAVASCRIPT LAYER INTERACTION INTERFACE --- -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     var viewImageModal = document.getElementById('viewImageModal');

@@ -16,12 +16,17 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['new_request'])) {
     $priority = $_POST['priority'];
     $reason = $_POST['reason'];
     $qty = (int)$_POST['quantity'];
-    $cost = (float)$_POST['estimated_cost'];
+    $unit_price = (float)$_POST['unit_price'];
+    
+    $cost = $qty * $unit_price; 
     $user = $_POST['requested_by'];
-    $today = date('Y-m-d');
+    
+    // INAYOS: Ginawang DATETIME format para kasama ang eksaktong oras ng upload
+    date_default_timezone_set('Asia/Manila'); // Sinisigurong oras sa Pilipinas ang masusunod
+    $timestamp = date('Y-m-d H:i:s');
 
     $stmt = $conn->prepare("INSERT INTO procurement_requests (item_name, category, priority, reason, quantity, estimated_cost, requested_by, request_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssidss", $item_name, $category, $priority, $reason, $qty, $cost, $user, $today);
+    $stmt->bind_param("ssssidss", $item_name, $category, $priority, $reason, $qty, $cost, $user, $timestamp);
     $stmt->execute();
     $stmt->close();
     header("Location: procurement.php");
@@ -35,7 +40,6 @@ $requests = $conn->query("SELECT * FROM procurement_requests ORDER BY request_id
 include_once 'includes/header.php';
 ?>
 
-<!-- Extra CSS overrides specifically for clean Procurement dashboard layout -->
 <style>
     .procurement-card {
         border: 1px solid #e5e7eb;
@@ -63,13 +67,11 @@ include_once 'includes/header.php';
         <h2 class="fw-bold m-0" style="color: #0b2545;">Procurement / To-Buy</h2>
         <p class="text-muted small m-0">Purchase requests and acquisition approval queue</p>
     </div>
-    <!-- Updated button to match DAZ Cyan Theme -->
     <button class="btn btn-custom-primary text-white fw-bold px-4 py-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#reqModal">
         <i class="fa-solid fa-plus me-2"></i>New Request
     </button>
 </div>
 
-<!-- ANALYTICS SUMMARY CARDS -->
 <div class="row g-4 mb-5">
     <div class="col-md-4">
         <div class="procurement-card p-4 text-center shadow-sm">
@@ -78,20 +80,19 @@ include_once 'includes/header.php';
         </div>
     </div>
     <div class="col-md-4">
-        <div class="procurement-card p-4 text-center shadow-sm" style="border-top-color: #fccb05;"> <!-- DAZ Yellow for Pending -->
+        <div class="procurement-card p-4 text-center shadow-sm" style="border-top-color: #fccb05;">
             <div class="text-muted small text-uppercase tracking-wider fw-bold mb-1" style="color: #d97706 !important;">Pending Approval</div>
             <div class="display-6 fw-bold" style="color: #d97706;"><?php echo $totals['pending_count'] ?? 0; ?></div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="procurement-card p-4 text-center shadow-sm" style="border-top-color: #00b4d8;"> <!-- DAZ Cyan for Costs -->
+        <div class="procurement-card p-4 text-center shadow-sm" style="border-top-color: #00b4d8;">
             <div class="text-muted small text-uppercase tracking-wider fw-bold mb-1">Est. Cost (Pending)</div>
             <div class="display-6 fw-bold" style="color: #0b2545;">₱<?php echo number_format($totals['pending_cost'] ?? 0, 2); ?></div>
         </div>
     </div>
 </div>
 
-<!-- LIST QUEUE COMPONENT -->
 <h5 class="fw-bold mb-3 text-secondary" style="font-size: 0.9rem; letter-spacing: 0.05em; text-transform: uppercase;">Request Log Sheets</h5>
 <div class="d-flex flex-column gap-3 mb-5">
     <?php if($requests->num_rows > 0): ?>
@@ -101,7 +102,6 @@ include_once 'includes/header.php';
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
                         <h5 class="fw-bold m-0 text-dark" style="font-size: 1.1rem;"><?php echo htmlspecialchars($row['item_name']); ?></h5>
                         
-                        <!-- Priority Pill Switch -->
                         <?php 
                             $p_class = ($row['priority'] == 'high') ? 'bg-danger text-danger' : (($row['priority'] == 'medium') ? 'bg-warning text-warning' : 'bg-secondary text-secondary');
                         ?>
@@ -126,8 +126,8 @@ include_once 'includes/header.php';
                     
                     <div class="text-secondary font-monospace small bg-light p-2 rounded d-inline-block" style="font-size: 0.8rem;">
                         <span class="me-2 text-dark"><i class="fa-solid fa-cubes me-1 opacity-50"></i>Qty: <strong><?php echo $row['quantity']; ?></strong></span> | 
-                        <span class="mx-2 text-dark"><i class="fa-solid fa-tags me-1 opacity-50"></i>Est: <strong>₱<?php echo number_format($row['estimated_cost'], 2); ?></strong></span> | 
-                        <span class="ms-2"><i class="fa-solid fa-user me-1 opacity-50"></i>By: <?php echo htmlspecialchars($row['requested_by']); ?> <span class="text-muted opacity-75">(<?php echo $row['request_date']; ?>)</span></span>
+                        <span class="mx-2 text-dark"><i class="fa-solid fa-tags me-1 opacity-50"></i>Total Cost: <strong class="text-primary">₱<?php echo number_format($row['estimated_cost'], 2); ?></strong></span> | 
+                        <span class="ms-2"><i class="fa-solid fa-user me-1 opacity-50"></i>By: <?php echo htmlspecialchars($row['requested_by']); ?> <span class="text-muted opacity-75">(<i class="fa-regular fa-clock me-1 small"></i><?php echo date_format(date_create($row['request_date']), "M d, Y - h:i A"); ?>)</span></span>
                     </div>
                 </div>
                 <div>
@@ -150,7 +150,6 @@ include_once 'includes/header.php';
     <?php endif; ?>
 </div>
 
-<!-- LOG PROCUREMENT REQUEST MODAL -->
 <div class="modal fade" id="reqModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <form action="procurement.php" method="POST" class="modal-content border-0 shadow">
@@ -184,16 +183,23 @@ include_once 'includes/header.php';
                 <label class="form-label small fw-bold text-secondary">Justification / Reason</label>
                 <textarea name="reason" class="form-control" rows="3" required placeholder="Mandatory replacement before site inspection..."></textarea>
             </div>
-            <div class="row g-2">
+            
+            <div class="row g-2 mb-3">
                 <div class="col-4">
                     <label class="form-label small fw-bold text-secondary">Quantity</label>
-                    <input type="number" name="quantity" class="form-control py-2" value="1" min="1" required>
+                    <input type="number" name="quantity" id="input_qty" class="form-control py-2" value="1" min="1" required>
                 </div>
                 <div class="col-8">
-                    <label class="form-label small fw-bold text-secondary">Estimated Cost (Total ₱)</label>
-                    <input type="number" name="estimated_cost" step="0.01" class="form-control py-2" placeholder="5600" required>
+                    <label class="form-label small fw-bold text-secondary">Unit Price (₱ bawat piraso)</label>
+                    <input type="number" name="unit_price" id="input_price" step="0.01" class="form-control py-2" placeholder="e.g. 1200" required>
                 </div>
             </div>
+            
+            <div class="p-3 mb-3 rounded border border-info border-opacity-25 bg-light d-flex justify-content-between align-items-center">
+                <span class="small fw-bold text-secondary"><i class="fa-solid fa-calculator me-1 text-info"></i> Computed Total Cost:</span>
+                <span class="fw-bold text-dark" style="font-size: 1.1rem;">₱<span id="live_total_preview">0.00</span></span>
+            </div>
+
             <div class="mt-3">
                 <label class="form-label small fw-bold text-secondary">Your Name</label>
                 <input type="text" name="requested_by" class="form-control py-2" placeholder="Marco S." required>
@@ -207,5 +213,23 @@ include_once 'includes/header.php';
     </form>
   </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var inputQty = document.getElementById('input_qty');
+    var inputPrice = document.getElementById('input_price');
+    var totalPreview = document.getElementById('live_total_preview');
+
+    function calculateTotal() {
+        var qty = parseInt(inputQty.value) || 0;
+        var price = parseFloat(inputPrice.value) || 0;
+        var total = qty * price;
+        totalPreview.textContent = total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    inputQty.addEventListener('input', calculateTotal);
+    inputPrice.addEventListener('input', calculateTotal);
+});
+</script>
 
 <?php include_once 'includes/footer.php'; ?>
