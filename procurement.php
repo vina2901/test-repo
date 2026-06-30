@@ -16,17 +16,16 @@ if($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['new_request'])) {
     $priority = $_POST['priority'];
     $reason = $_POST['reason'];
     $qty = (int)$_POST['quantity'];
-    $unit_price = (float)$_POST['unit_price'];
+    $unit_price = (float)$_POST['unit_price']; 
     
     $cost = $qty * $unit_price; 
     $user = $_POST['requested_by'];
     
-    // INAYOS: Ginawang DATETIME format para kasama ang eksaktong oras ng upload
-    date_default_timezone_set('Asia/Manila'); // Sinisigurong oras sa Pilipinas ang masusunod
+    date_default_timezone_set('Asia/Manila'); 
     $timestamp = date('Y-m-d H:i:s');
 
-    $stmt = $conn->prepare("INSERT INTO procurement_requests (item_name, category, priority, reason, quantity, estimated_cost, requested_by, request_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssssidss", $item_name, $category, $priority, $reason, $qty, $cost, $user, $timestamp);
+    $stmt = $conn->prepare("INSERT INTO procurement_requests (item_name, category, priority, reason, quantity, unit_price, estimated_cost, requested_by, request_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssssiddss", $item_name, $category, $priority, $reason, $qty, $unit_price, $cost, $user, $timestamp);
     $stmt->execute();
     $stmt->close();
     header("Location: procurement.php");
@@ -43,7 +42,7 @@ include_once 'includes/header.php';
 <style>
     .procurement-card {
         border: 1px solid #e5e7eb;
-        border-top: 4px solid #0b2545; /* Brand Deep Blue Top bar */
+        border-top: 4px solid #0b2545; 
         border-radius: 8px;
         background: #ffffff;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -59,6 +58,11 @@ include_once 'includes/header.php';
     .request-row:hover {
         border-color: #cbd5e1 !important;
         background-color: #f8fafc !important;
+    }
+    /* Dagdag na styling para sa Form Inputs ng Modal */
+    .modal-input-custom:focus {
+        border-color: #0b2545 !important;
+        box-shadow: 0 0 0 0.25rem rgba(11, 37, 69, 0.15) !important;
     }
 </style>
 
@@ -97,10 +101,11 @@ include_once 'includes/header.php';
 <div class="d-flex flex-column gap-3 mb-5">
     <?php if($requests->num_rows > 0): ?>
         <?php while($row = $requests->fetch_assoc()): ?>
-            <div class="p-4 bg-white border request-row shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div>
+            <div class="p-4 bg-white border request-row shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-3" style="border-left: 5px solid <?php echo ($row['priority'] == 'high') ? '#dc3545' : (($row['priority'] == 'medium') ? '#ffc107' : '#6c757d'); ?> !important;">
+                
+                <div style="flex: 1; min-width: 280px;">
                     <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-                        <h5 class="fw-bold m-0 text-dark" style="font-size: 1.1rem;"><?php echo htmlspecialchars($row['item_name']); ?></h5>
+                        <h5 class="fw-bold m-0 text-dark" style="font-size: 1.2rem; color: #0b2545 !important;"><?php echo htmlspecialchars($row['item_name']); ?></h5>
                         
                         <?php 
                             $p_class = ($row['priority'] == 'high') ? 'bg-danger text-danger' : (($row['priority'] == 'medium') ? 'bg-warning text-warning' : 'bg-secondary text-secondary');
@@ -109,7 +114,7 @@ include_once 'includes/header.php';
                             <i class="fa-solid fa-triangle-exclamation me-1"></i><?php echo $row['priority']; ?>
                         </span>
                         
-                        <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.75rem;"><?php echo htmlspecialchars($row['category']); ?></span>
+                        <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.75rem;"><i class="fa-solid fa-folder me-1 opacity-50"></i><?php echo htmlspecialchars($row['category']); ?></span>
                         
                         <?php if($row['approval_status'] == 'Approved'): ?>
                             <span class="badge bg-success bg-opacity-10 text-success px-2 py-1" style="font-size: 0.75rem; font-weight: 600;">
@@ -122,25 +127,50 @@ include_once 'includes/header.php';
                         <?php endif; ?>
                     </div>
                     
-                    <p class="text-muted small mb-3" style="max-width: 700px;"><?php echo htmlspecialchars($row['reason']); ?></p>
+                    <p class="text-muted small mb-3" style="max-width: 700px; border-left: 2px solid #e2e8f0; padding-left: 10px; font-style: italic;">
+                        "<?php echo htmlspecialchars($row['reason']); ?>"
+                    </p>
                     
-                    <div class="text-secondary font-monospace small bg-light p-2 rounded d-inline-block" style="font-size: 0.8rem;">
-                        <span class="me-2 text-dark"><i class="fa-solid fa-cubes me-1 opacity-50"></i>Qty: <strong><?php echo $row['quantity']; ?></strong></span> | 
-                        <span class="mx-2 text-dark"><i class="fa-solid fa-tags me-1 opacity-50"></i>Total Cost: <strong class="text-primary">₱<?php echo number_format($row['estimated_cost'], 2); ?></strong></span> | 
-                        <span class="ms-2"><i class="fa-solid fa-user me-1 opacity-50"></i>By: <?php echo htmlspecialchars($row['requested_by']); ?> <span class="text-muted opacity-75">(<i class="fa-regular fa-clock me-1 small"></i><?php echo date_format(date_create($row['request_date']), "M d, Y - h:i A"); ?>)</span></span>
+                    <div class="text-muted small">
+                        <i class="fa-solid fa-user me-1 opacity-50"></i> Requested by: <strong class="text-dark"><?php echo htmlspecialchars($row['requested_by']); ?></strong> 
+                        <span class="mx-2 text-silver">|</span> 
+                        <i class="fa-regular fa-clock me-1 opacity-50"></i> <?php echo date_format(date_create($row['request_date']), "M d, Y - h:i A"); ?>
                     </div>
                 </div>
-                <div>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap" style="background: #f8fafc; padding: 12px 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div class="text-center px-2">
+                        <span class="d-block text-uppercase text-muted font-monospace" style="font-size: 0.65rem; letter-spacing: 0.05em;">Quantity</span>
+                        <span class="fw-bold text-dark" style="font-size: 1.05rem;"><i class="fa-solid fa-boxes-stacked me-1 opacity-50" style="font-size: 0.85rem;"></i><?php echo $row['quantity']; ?></span>
+                    </div>
+                    
+                    <div style="width: 1px; height: 30px; background: #cbd5e1;" class="mx-2 d-none d-sm-block"></div>
+                    
+                    <div class="text-center px-2">
+                        <span class="d-block text-uppercase text-muted font-monospace" style="font-size: 0.65rem; letter-spacing: 0.05em;">Price Each</span>
+                        <span class="fw-bold text-secondary" style="font-size: 1.05rem;">₱<?php echo number_format($row['unit_price'] ?? 0, 2); ?></span>
+                    </div>
+                    
+                    <div style="width: 1px; height: 30px; background: #cbd5e1;" class="mx-2 d-none d-sm-block"></div>
+                    
+                    <div class="text-center px-3">
+                        <span class="d-block text-uppercase text-primary font-monospace fw-bold" style="font-size: 0.65rem; letter-spacing: 0.05em;">Total Cost</span>
+                        <span class="fw-bold text-primary" style="font-size: 1.15rem;">₱<?php echo number_format($row['estimated_cost'], 2); ?></span>
+                    </div>
+                </div>
+
+                <div class="text-end" style="min-width: 120px;">
                     <?php if($row['approval_status'] == 'Pending'): ?>
-                        <a href="procurement.php?action=approve&id=<?php echo $row['request_id']; ?>" class="btn btn-success btn-sm px-4 fw-bold shadow-xs py-2 rounded-pill">
+                        <a href="procurement.php?action=approve&id=<?php echo $row['request_id']; ?>" class="btn btn-success btn-sm w-100 fw-bold shadow-sm py-2 px-3 rounded">
                             <i class="fa-solid fa-check me-1"></i>Approve
                         </a>
                     <?php else: ?>
-                        <button class="btn btn-light btn-sm text-muted px-4 py-2 rounded-pill border" disabled>
-                            <i class="fa-solid fa-lock me-1"></i>Locked
-                        </button>
+                        <span class="text-muted small d-block text-center border rounded py-2 bg-light font-monospace" style="font-size: 0.8rem;">
+                            <i class="fa-solid fa-lock me-1 text-secondary"></i>Processed
+                        </span>
                     <?php endif; ?>
                 </div>
+
             </div>
         <?php endwhile; ?>
     <?php else: ?>
@@ -151,63 +181,91 @@ include_once 'includes/header.php';
 </div>
 
 <div class="modal fade" id="reqModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <form action="procurement.php" method="POST" class="modal-content border-0 shadow">
-      <div class="modal-header text-white" style="background-color: #0b2545;">
-        <h5 class="modal-title fw-bold" style="font-size: 1.1rem;"><i class="fa-solid fa-clipboard-list me-2 text-warning"></i>Log Procurement Request</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+  <div class="modal-dialog modal-dialog-centered modal-md">
+    <form action="procurement.php" method="POST" class="modal-content border-0 shadow-lg" style="border-radius: 12px; overflow: hidden;">
+      
+      <div class="modal-header text-white p-3 border-0" style="background-color: #0b2545;">
+        <h5 class="modal-title fw-bold d-flex align-items-center" style="font-size: 1.1rem;">
+            <i class="fa-solid fa-square-plus me-2 text-warning" style="font-size: 1.3rem;"></i>Create Procurement Ticket
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-4">
+      
+      <div class="modal-body p-4 bg-white">
             <div class="mb-3">
-                <label class="form-label small fw-bold text-secondary">Item Name / Description</label>
-                <input type="text" name="item_name" class="form-control py-2" required placeholder="Safety Harness">
+                <label class="form-label small fw-bold text-dark d-flex align-items-center mb-1">
+                    <i class="fa-solid fa-screwdriver-wrench me-1 text-secondary opacity-75"></i> Item Name / Description
+                </label>
+                <input type="text" name="item_name" class="form-control py-2 modal-input-custom" required placeholder="e.g. Heavy Duty Safety Harness" style="border-radius: 6px;">
             </div>
+            
+            <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                    <label class="form-label small fw-bold text-dark d-flex align-items-center mb-1">
+                        <i class="fa-solid fa-folder-open me-1 text-secondary opacity-75"></i> Category
+                    </label>
+                    <select name="category" class="form-select py-2 modal-input-custom" style="border-radius: 6px;">
+                        <option value="Power Tools">Power Tools</option>
+                        <option value="Hand Tools">Hand Tools</option>
+                        <option value="PPE / Safety">PPE / Safety</option>
+                        <option value="Chemicals & Solvents">Chemicals & Solvents</option>
+                    </select>
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label small fw-bold text-dark d-flex align-items-center mb-1">
+                        <i class="fa-solid fa-circle-exclamation me-1 text-secondary opacity-75"></i> Priority Level
+                    </label>
+                    <select name="priority" class="form-select py-2 modal-input-custom" style="border-radius: 6px;">
+                        <option value="low">🟢 Low Urgency</option>
+                        <option value="medium" selected>🟡 Medium Priority</option>
+                        <option value="high">🔴 High Urgency</option>
+                    </select>
+                </div>
+            </div>
+            
             <div class="mb-3">
-                <label class="form-label small fw-bold text-secondary">Category Classification</label>
-                <select name="category" class="form-select py-2">
-                    <option value="Power Tools">Power Tools</option>
-                    <option value="Hand Tools">Hand Tools</option>
-                    <option value="PPE / Safety">PPE / Safety</option>
-                    <option value="Chemicals & Solvents">Chemicals & Solvents</option>
-                </select>
+                <label class="form-label small fw-bold text-dark d-flex align-items-center mb-1">
+                    <i class="fa-solid fa-comment-dots me-1 text-secondary opacity-75"></i> Justification / Reason
+                </label>
+                <textarea name="reason" class="form-control modal-input-custom" rows="3" required placeholder="State the main reason (e.g., Mandatory replacement before site inspection...)" style="border-radius: 6px; resize: none;"></textarea>
             </div>
-            <div class="mb-3">
-                <label class="form-label small fw-bold text-secondary">Priority Urgency</label>
-                <select name="priority" class="form-select py-2">
-                    <option value="low">Low</option>
-                    <option value="medium" selected>Medium</option>
-                    <option value="high">High</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label small fw-bold text-secondary">Justification / Reason</label>
-                <textarea name="reason" class="form-control" rows="3" required placeholder="Mandatory replacement before site inspection..."></textarea>
-            </div>
+            
+            <hr class="text-muted opacity-25 my-3">
             
             <div class="row g-2 mb-3">
                 <div class="col-4">
-                    <label class="form-label small fw-bold text-secondary">Quantity</label>
-                    <input type="number" name="quantity" id="input_qty" class="form-control py-2" value="1" min="1" required>
+                    <label class="form-label small fw-bold text-dark mb-1">Quantity</label>
+                    <div class="input-group">
+                        <input type="number" name="quantity" id="input_qty" class="form-control py-2 modal-input-custom text-center fw-bold" value="1" min="1" required style="border-radius: 6px;">
+                    </div>
                 </div>
                 <div class="col-8">
-                    <label class="form-label small fw-bold text-secondary">Unit Price (₱ bawat piraso)</label>
-                    <input type="number" name="unit_price" id="input_price" step="0.01" class="form-control py-2" placeholder="e.g. 1200" required>
+                    <label class="form-label small fw-bold text-dark mb-1">Unit Price (₱ Price per piece)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0 text-muted" style="border-top-left-radius: 6px; border-bottom-left-radius: 6px;">₱</span>
+                        <input type="number" name="unit_price" id="input_price" step="0.01" class="form-control py-2 modal-input-custom border-start-0" placeholder="0.00" required style="border-top-right-radius: 6px; border-bottom-right-radius: 6px;">
+                    </div>
                 </div>
             </div>
             
-            <div class="p-3 mb-3 rounded border border-info border-opacity-25 bg-light d-flex justify-content-between align-items-center">
-                <span class="small fw-bold text-secondary"><i class="fa-solid fa-calculator me-1 text-info"></i> Computed Total Cost:</span>
-                <span class="fw-bold text-dark" style="font-size: 1.1rem;">₱<span id="live_total_preview">0.00</span></span>
+            <div class="p-3 mb-3 d-flex justify-content-between align-items-center" style="background-color: #f0f4f8; border-radius: 8px; border-left: 4px solid #0b2545;">
+                <span class="small fw-bold text-secondary d-flex align-items-center">
+                    <i class="fa-solid fa-calculator me-2 text-primary" style="font-size: 1rem;"></i> Estimated Total Cost:
+                </span>
+                <span class="fw-bold" style="font-size: 1.25rem; color: #0b2545;">₱<span id="live_total_preview">0.00</span></span>
             </div>
 
             <div class="mt-3">
-                <label class="form-label small fw-bold text-secondary">Your Name</label>
-                <input type="text" name="requested_by" class="form-control py-2" placeholder="Marco S." required>
+                <label class="form-label small fw-bold text-dark d-flex align-items-center mb-1">
+                    <i class="fa-solid fa-user-pen me-1 text-secondary opacity-75"></i> Requested By (Your Name)
+                </label>
+                <input type="text" name="requested_by" class="form-control py-2 modal-input-custom" placeholder="e.g. Marco S." required style="border-radius: 6px;">
             </div>
       </div>
-      <div class="modal-footer border-0 bg-light">
-        <button type="submit" name="new_request" class="btn btn-custom-primary text-white w-100 fw-bold py-2 shadow-sm">
-            Submit Procurement Ticket
+      
+      <div class="modal-footer border-0 p-3" style="background-color: #f8fafc;">
+        <button type="submit" name="new_request" class="btn text-white w-100 fw-bold py-2 shadow-sm" style="background-color: #0b2545; border-radius: 6px; transition: background 0.2s;">
+            <i class="fa-solid fa-paper-plane me-2"></i>Submit Procurement Ticket
         </button>
       </div>
     </form>

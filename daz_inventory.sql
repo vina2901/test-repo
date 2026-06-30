@@ -73,17 +73,21 @@ CREATE TABLE IF NOT EXISTS `borrow_records` (
     FOREIGN KEY (`item_id`) REFERENCES `inventory_items` (`item_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 7. Table structure para sa 'procurement_requests' (Para sa procurement.php)
-CREATE TABLE IF NOT EXISTS `procurement_requests` (
+-- Burahin muna ang lumang table kung gusto mong i-recreate nang buo na walang error
+DROP TABLE IF EXISTS `procurement_requests`;
+
+-- Table structure para sa 'procurement_requests' (Na may hiwalay na unit_price at estimated_cost)
+CREATE TABLE `procurement_requests` (
     `request_id` INT AUTO_INCREMENT PRIMARY KEY,
     `item_name` VARCHAR(255) NOT NULL,
     `category` VARCHAR(100) NOT NULL,
     `priority` ENUM('low', 'medium', 'high') NOT NULL DEFAULT 'medium',
     `reason` TEXT NOT NULL,
     `quantity` INT NOT NULL DEFAULT 1,
-    `estimated_cost` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    `unit_price` DECIMAL(10, 2) NOT NULL DEFAULT 0.00, -- DINAGDAG: Dito mase-save ang presyo kada piraso
+    `estimated_cost` DECIMAL(10, 2) NOT NULL DEFAULT 0.00, -- Nananatiling kabuuang total (Qty * Price)
     `requested_by` VARCHAR(150) NOT NULL,
-    `request_date` DATE NOT NULL,
+    `request_date` DATETIME NOT NULL, 
     `approval_status` ENUM('Pending', 'Approved', 'Rejected') NOT NULL DEFAULT 'Pending',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -92,3 +96,6 @@ CREATE TABLE IF NOT EXISTS `procurement_requests` (
 INSERT INTO `users` (`username`, `password`, `email`, `role`) 
 VALUES ('admin', '$2y$10$EPY9m2vNOn8v8I2Y4V5SXO9X4pM2hZt2m7M2Y7R6v7kCg0vW9yvOi', 'admin@daz.com', 'admin')
 ON DUPLICATE KEY UPDATE `username`=`username`;
+
+ALTER TABLE procurement_requests 
+MODIFY COLUMN request_date DATETIME NOT NULL;
