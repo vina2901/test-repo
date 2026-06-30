@@ -1,4 +1,3 @@
--- Siguraduhing gamitin ang tamang database base sa iyong screenshot
 CREATE DATABASE IF NOT EXISTS `daz_inventory`;
 USE `daz_inventory`;
 
@@ -94,7 +93,7 @@ CREATE TABLE `procurement_requests` (
 
 -- 8. Mag-insert ng isang default user (Username: admin | Password: password123)
 INSERT INTO `users` (`username`, `password`, `email`, `role`) 
-VALUES ('admin', '$2y$10$EPY9m2vNOn8v8I2Y4V5SXO9X4pM2hZt2m7M2Y7R6v7kCg0vW9yvOi', 'admin@daz.com', 'admin')
+VALUES ('admin', 'password123', 'admin@daz.com', 'admin')
 ON DUPLICATE KEY UPDATE `username`=`username`;
 
 ALTER TABLE procurement_requests 

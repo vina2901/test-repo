@@ -155,6 +155,11 @@
             <i class="fa-solid fa-clock-rotate-left me-3"></i> Action History
         </a>
     </li>
+    <li class="nav-item mt-3">
+    <a href="logout.php" class="nav-link">
+        <i class="fa-solid fa-right-from-bracket me-3"></i> Logout
+    </a>
+</li>
 </ul>
     
     <div class="px-2 py-2 text-center" style="font-size: 0.65rem; color: #64748b; font-weight: 400; border-top: 1px solid rgba(255,255,255,0.05);">
